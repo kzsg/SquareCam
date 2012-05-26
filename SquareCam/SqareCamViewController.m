@@ -783,7 +783,7 @@ bail:
     [super viewDidLoad];
 	// Do any additional setup after loading the view, typically from a nib.
 	[self setupAVCapture];
-	square = [[UIImage imageNamed:@"squarePNG"] retain];
+	square = [[UIImage imageNamed:@"mask"] retain];
 	NSDictionary *detectorOptions = [[NSDictionary alloc] initWithObjectsAndKeys:CIDetectorAccuracyLow, CIDetectorAccuracy, nil];
 	faceDetector = [[CIDetector detectorOfType:CIDetectorTypeFace context:nil options:detectorOptions] retain];
 	[detectorOptions release];
