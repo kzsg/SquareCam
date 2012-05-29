@@ -644,6 +644,16 @@ bail:
 			[previewLayer addSublayer:featureLayer];
 			[featureLayer release];
 		}
+        
+        CGFloat width = faceRect.size.width;
+        CGFloat height = faceRect.size.height;
+        faceRect.size.width = width * 1.5;
+        faceRect.size.height = height * 1.5;
+		faceRect.origin.x = faceRect.origin.x - (faceRect.size.width - width)/2;
+        faceRect.origin.y = faceRect.origin.y - (faceRect.size.height - height)/1.5;
+        
+        CGRect rect = CGRectMake(0.0, 0.0, 1.0, 1.0); // full size
+        featureLayer.contentsRect = rect;
 		[featureLayer setFrame:faceRect];
 		
 		switch (orientation) {
@@ -783,7 +793,7 @@ bail:
     [super viewDidLoad];
 	// Do any additional setup after loading the view, typically from a nib.
 	[self setupAVCapture];
-	square = [[UIImage imageNamed:@"mask"] retain];
+	square = [[UIImage imageNamed:@"anonymous"] retain];
 	NSDictionary *detectorOptions = [[NSDictionary alloc] initWithObjectsAndKeys:CIDetectorAccuracyLow, CIDetectorAccuracy, nil];
 	faceDetector = [[CIDetector detectorOfType:CIDetectorTypeFace context:nil options:detectorOptions] retain];
 	[detectorOptions release];
