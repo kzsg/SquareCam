@@ -49,25 +49,31 @@ final class CameraViewController: UIViewController {
     // MARK: - Setup
 
     private func configureButtons() {
-        captureButton.setTitle("Capture", for: .normal)
-        captureButton.setTitleColor(.white, for: .normal)
-        captureButton.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.8)
-        captureButton.layer.cornerRadius = 8
-        captureButton.contentEdgeInsets = UIEdgeInsets(top: 12, left: 20, bottom: 12, right: 20)
+        var captureConfig = UIButton.Configuration.filled()
+        captureConfig.title = "Capture"
+        captureConfig.baseForegroundColor = .white
+        captureConfig.baseBackgroundColor = UIColor.systemBlue.withAlphaComponent(0.8)
+        captureConfig.cornerStyle = .medium
+        captureConfig.contentInsets = NSDirectionalEdgeInsets(top: 12, leading: 20, bottom: 12, trailing: 20)
+        captureButton.configuration = captureConfig
         captureButton.addTarget(self, action: #selector(capturePhoto), for: .touchUpInside)
 
-        cameraToggleButton.setTitle("Flip", for: .normal)
-        cameraToggleButton.setTitleColor(.white, for: .normal)
-        cameraToggleButton.backgroundColor = UIColor.systemGray.withAlphaComponent(0.8)
-        cameraToggleButton.layer.cornerRadius = 8
-        cameraToggleButton.contentEdgeInsets = UIEdgeInsets(top: 12, left: 16, bottom: 12, right: 16)
+        var flipConfig = UIButton.Configuration.filled()
+        flipConfig.title = "Flip"
+        flipConfig.baseForegroundColor = .white
+        flipConfig.baseBackgroundColor = UIColor.systemGray.withAlphaComponent(0.8)
+        flipConfig.cornerStyle = .medium
+        flipConfig.contentInsets = NSDirectionalEdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16)
+        cameraToggleButton.configuration = flipConfig
         cameraToggleButton.addTarget(self, action: #selector(toggleCamera), for: .touchUpInside)
 
-        faceToggleButton.setTitle("Faces On", for: .normal)
-        faceToggleButton.setTitleColor(.white, for: .normal)
-        faceToggleButton.backgroundColor = UIColor.systemGreen.withAlphaComponent(0.8)
-        faceToggleButton.layer.cornerRadius = 8
-        faceToggleButton.contentEdgeInsets = UIEdgeInsets(top: 12, left: 16, bottom: 12, right: 16)
+        var faceConfig = UIButton.Configuration.filled()
+        faceConfig.title = "Faces On"
+        faceConfig.baseForegroundColor = .white
+        faceConfig.baseBackgroundColor = UIColor.systemGreen.withAlphaComponent(0.8)
+        faceConfig.cornerStyle = .medium
+        faceConfig.contentInsets = NSDirectionalEdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16)
+        faceToggleButton.configuration = faceConfig
         faceToggleButton.addTarget(self, action: #selector(toggleFaceDetection), for: .touchUpInside)
     }
 
@@ -213,8 +219,13 @@ final class CameraViewController: UIViewController {
             guard let self else { return }
             let title = faceDetectionEnabled ? "Faces On" : "Faces Off"
             let background = faceDetectionEnabled ? UIColor.systemGreen : UIColor.systemGray
-            faceToggleButton.setTitle(title, for: .normal)
-            faceToggleButton.backgroundColor = background.withAlphaComponent(0.8)
+            var config = faceToggleButton.configuration ?? UIButton.Configuration.filled()
+            config.title = title
+            config.baseForegroundColor = .white
+            config.baseBackgroundColor = background.withAlphaComponent(0.8)
+            config.cornerStyle = .medium
+            config.contentInsets = NSDirectionalEdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16)
+            faceToggleButton.configuration = config
             overlayLayer.isHidden = !faceDetectionEnabled
             if !faceDetectionEnabled {
                 overlayLayer.path = nil
@@ -380,3 +391,4 @@ private extension AVCaptureVideoOrientation {
         }
     }
 }
+
