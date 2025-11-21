@@ -168,6 +168,9 @@ final class CameraViewController: UIViewController {
             settings.flashMode = .auto
             self.sessionQueue.async { [weak self] in
                 guard let self else { return }
+                if let connection = self.photoOutput.connection(with: .video) {
+                    connection.videoOrientation = self.currentOrientation
+                }
                 self.photoOutput.capturePhoto(with: settings, delegate: self)
             }
         }
@@ -225,6 +228,9 @@ final class CameraViewController: UIViewController {
             currentOrientation = orientation
             connection.videoOrientation = orientation
             videoOutput.connections.forEach { $0.videoOrientation = orientation }
+            if let photoConnection = photoOutput.connection(with: .video) {
+                photoConnection.videoOrientation = orientation
+            }
         }
     }
 
