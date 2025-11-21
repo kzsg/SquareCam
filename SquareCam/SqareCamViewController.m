@@ -49,7 +49,7 @@
 #import <CoreImage/CoreImage.h>
 #import <ImageIO/ImageIO.h>
 #import <AssertMacros.h>
-#import <AssetsLibrary/AssetsLibrary.h>
+#import <Photos/Photos.h>
 
 #pragma mark-
 
@@ -179,6 +179,8 @@ static CGContextRef CreateCGBitmapContextForSize(CGSize size)
 - (void)setupAVCapture;
 - (void)teardownAVCapture;
 - (void)drawFaceBoxesForFeatures:(NSArray *)features forVideoBox:(CGRect)clap orientation:(UIDeviceOrientation)orientation;
+- (void)requestPhotoLibraryAccessIfNeeded:(void (^)(BOOL granted))completion;
+- (void)saveImageDataToPhotoLibrary:(NSData *)imageData completion:(void (^)(NSError *error))completion;
 @end
 
 @implementation SquareCamViewController
@@ -254,13 +256,13 @@ bail:
 // clean up capture setup
 - (void)teardownAVCapture
 {
-	[videoDataOutput release];
-	if (videoDataOutputQueue)
-		dispatch_release(videoDataOutputQueue);
-	[stillImageOutput removeObserver:self forKeyPath:@"isCapturingStillImage"];
-	[stillImageOutput release];
-	[previewLayer removeFromSuperlayer];
-	[previewLayer release];
+        [videoDataOutput release];
+        if (videoDataOutputQueue)
+                dispatch_release(videoDataOutputQueue);
+        [stillImageOutput removeObserver:self forKeyPath:@"capturingStillImage"];
+        [stillImageOutput release];
+        [previewLayer removeFromSuperlayer];
+        [previewLayer release];
 }
 
 // perform a flash bulb animation using KVO to monitor the value of the capturingStillImage property of the AVCaptureStillImageOutput class
@@ -358,8 +360,8 @@ bail:
 // utility routine used after taking a still image to write the resulting image to the camera roll
 - (BOOL)writeCGImageToCameraRoll:(CGImageRef)cgImage withMetadata:(NSDictionary *)metadata
 {
-	CFMutableDataRef destinationData = CFDataCreateMutable(kCFAllocatorDefault, 0);
-	CGImageDestinationRef destination = CGImageDestinationCreateWithData(destinationData, 
+        CFMutableDataRef destinationData = CFDataCreateMutable(kCFAllocatorDefault, 0);
+        CGImageDestinationRef destination = CGImageDestinationCreateWithData(destinationData,
 																		 CFSTR("public.jpeg"), 
 																		 1, 
 																		 NULL);
@@ -384,30 +386,67 @@ bail:
 	if ( optionsDict )
 		CFRelease(optionsDict);
 	
-	require(success, bail);
-	
-	CFRetain(destinationData);
-	ALAssetsLibrary *library = [ALAssetsLibrary new];
-	[library writeImageDataToSavedPhotosAlbum:(id)destinationData metadata:metadata completionBlock:^(NSURL *assetURL, NSError *error) {
-		if (destinationData)
-			CFRelease(destinationData);
-	}];
-	[library release];
+        require(success, bail);
+
+        NSData *imageData = [NSData dataWithBytes:CFDataGetBytePtr(destinationData) length:CFDataGetLength(destinationData)];
+        [self saveImageDataToPhotoLibrary:imageData completion:nil];
 
 
 bail:
-	if (destinationData)
-		CFRelease(destinationData);
-	if (destination)
-		CFRelease(destination);
-	return success;
+        if (destinationData)
+                CFRelease(destinationData);
+        if (destination)
+                CFRelease(destination);
+        return success;
+}
+
+- (void)requestPhotoLibraryAccessIfNeeded:(void (^)(BOOL granted))completion
+{
+        PHAuthorizationStatus status = [PHPhotoLibrary authorizationStatus];
+        if (status == PHAuthorizationStatusAuthorized || status == PHAuthorizationStatusLimited) {
+                if (completion)
+                        completion(YES);
+        } else if (status == PHAuthorizationStatusNotDetermined) {
+                [PHPhotoLibrary requestAuthorization:^(PHAuthorizationStatus newStatus) {
+                        if (completion)
+                                completion(newStatus == PHAuthorizationStatusAuthorized || newStatus == PHAuthorizationStatusLimited);
+                }];
+        } else {
+                if (completion)
+                        completion(NO);
+        }
+}
+
+- (void)saveImageDataToPhotoLibrary:(NSData *)imageData completion:(void (^)(NSError *error))completion
+{
+        void (^performSave)(void) = ^{
+                [[PHPhotoLibrary sharedPhotoLibrary] performChanges:^{
+                        PHAssetCreationRequest *creationRequest = [PHAssetCreationRequest creationRequestForAsset];
+                        [creationRequest addResourceWithType:PHAssetResourceTypePhoto data:imageData options:nil];
+                } completionHandler:^(BOOL success, NSError * _Nullable error) {
+                        if (completion) {
+                                dispatch_async(dispatch_get_main_queue(), ^{
+                                        completion(error);
+                                });
+                        }
+                }];
+        };
+
+        [self requestPhotoLibraryAccessIfNeeded:^(BOOL granted) {
+                if (granted) {
+                        performSave();
+                } else if (completion) {
+                        NSError *authError = [NSError errorWithDomain:PHPhotosErrorDomain code:1 userInfo:@{NSLocalizedDescriptionKey: @"Photo library access denied"}];
+                        completion(authError);
+                }
+        }];
 }
 
 // utility routine to display error aleart if takePicture fails
 - (void)displayErrorOnMainQueue:(NSError *)error withMessage:(NSString *)message
 {
-	dispatch_async(dispatch_get_main_queue(), ^(void) {
-		UIAlertView *alertView = [[UIAlertView alloc] initWithTitle:[NSString stringWithFormat:@"%@ (%d)", message, (int)[error code]]
+        dispatch_async(dispatch_get_main_queue(), ^(void) {
+                UIAlertView *alertView = [[UIAlertView alloc] initWithTitle:[NSString stringWithFormat:@"%@ (%d)", message, (int)[error code]]
 															message:[error localizedDescription]
 														   delegate:nil 
 												  cancelButtonTitle:@"Dismiss" 
@@ -492,26 +531,26 @@ bail:
 					
 					[ciImage release];
 				}
-				else {
-					// trivial simple JPEG case
-					NSData *jpegData = [AVCaptureStillImageOutput jpegStillImageNSDataRepresentation:imageDataSampleBuffer];
-					CFDictionaryRef attachments = CMCopyDictionaryOfAttachments(kCFAllocatorDefault, 
-																				imageDataSampleBuffer, 
-																				kCMAttachmentMode_ShouldPropagate);
-					ALAssetsLibrary *library = [[ALAssetsLibrary alloc] init];
-					[library writeImageDataToSavedPhotosAlbum:jpegData metadata:(id)attachments completionBlock:^(NSURL *assetURL, NSError *error) {
-						if (error) {
-							[self displayErrorOnMainQueue:error withMessage:@"Save to camera roll failed"];
-						}
-					}];
-					
-					if (attachments)
-						CFRelease(attachments);
-					[library release];
-				}
-			}
-		}
-	 ];
+                                else {
+                                        // trivial simple JPEG case
+                                        NSData *jpegData = [AVCaptureStillImageOutput jpegStillImageNSDataRepresentation:imageDataSampleBuffer];
+                                        CFDictionaryRef attachments = CMCopyDictionaryOfAttachments(kCFAllocatorDefault,
+                                                                                                                               imageDataSampleBuffer,
+                                                                                                                               kCMAttachmentMode_ShouldPropagate);
+                                        NSData *imageCopy = [[NSData alloc] initWithData:jpegData];
+                                        [self saveImageDataToPhotoLibrary:imageCopy completion:^(NSError *error) {
+                                                if (error) {
+                                                        [self displayErrorOnMainQueue:error withMessage:@"Save to camera roll failed"];
+                                                }
+                                                if (attachments)
+                                                        CFRelease(attachments);
+                                                [imageCopy release];
+                                        }];
+
+                                }
+                        }
+                }
+         ];
 }
 
 // turn on/off face detection
